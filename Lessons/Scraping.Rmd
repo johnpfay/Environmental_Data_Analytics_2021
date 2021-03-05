@@ -1,0 +1,127 @@
+---
+title: "17: Data Scraping"
+author: "Environmental Data Analytics | Kateri Salk"
+date: "Spring 2021"
+output: pdf_document
+geometry: margin=2.54cm
+editor_options: 
+  chunk_output_type: console
+---
+
+## Objectives
+1. Acquire and scrape data from web sources
+2. Process web-scraped data into reproducible formats
+
+## Set up
+```{r, message = FALSE}
+getwd()
+library(tidyverse)
+library(lubridate)
+library(viridis)
+#install.packages("rvest")
+library(rvest)
+#install.packages("ggrepel")
+library(ggrepel)
+
+# Set theme
+mytheme <- theme_classic() +
+  theme(axis.text = element_text(color = "black"), 
+        legend.position = "top")
+theme_set(mytheme)
+```
+
+
+## Exploring the data we want to scrape
+
+* Navigate to <https://www.ncwater.org/WUDC/app/WWATR/report>. This site lists water use reports submitted by various industries around NC.
+* Click on the link to view the report for "Plant 15" facility in 2020: <https://www.ncwater.org/WUDC/app/WWATR/report/view/0004-0001/2020>
+ * View the data we can scrape on this page. 
+ 
+What we want to do first is scrape the average daily water withdrawal for a given site along with the site's "registrant" and their "facility type". Once we see how it's done with one site, we'll look at how we can iterate through many sites and grab the data we want data from each. 
+
+
+### Fetching the contents
+To begin, we'll fetch the contents of the web site into our coding environment using rvests `read_html()` function. 
+
+```{r}
+#Fetch the web resources from the URL
+webpage <- read_html('https://www.ncwater.org/WUDC/app/WWATR/report/view/0004-0001/2020')
+webpage
+
+```
+
+### Understanding web pages from a coding standpoint
+The `read_html()` function returns a list of the two elements, <head> and <body>, that comprise a typical web page. 
+ * The <head> mostly contains information and instructions on how the page should be constructed. 
+ * The <body> mostly contains the content that is displayed in your browser.
+ 
+EXERCISE: Open the source of the web page in your browser (<ctrl>-<u>).
+* Do you see the <head> and <body> sections? 
+* Do you see where it states the registrant? ("American & Efird, Inc.")
+
+HTML files follow a syntax of **tags** (what falls beteween the `<` and `>`) and **values**. Tags can indicate what kind of hyper-text element it is, and they can also include **properties** such as "id" and "class" to which specific **property values** can be assigned. This is important to know at some level, because it's this system of tags, properties, and property values that allow us to target specific elements in a web page so that we can scrape the data we want. You'll also see that items are hierarchical with some items (e.g. <table> containing other items <tr>).
+
+### Scraping the data
+
+Now we want to scrape the data shown in the page into a coding object. The bits we want to scrape are:
+* The name of the Registrant: "American & Efird, Inc." 
+* The facility type: "Industrial"
+* And the average water withdrawals for each month: "0.584. 0.647, 0.543, etc."
+
+To do this we first need to install a tool on our web browser to be able to call the web text we need. The tool is called a Selector Gadget, which for Chrome can be found [here](https://chrome.google.com/webstore/detail/selectorgadget/mhjhnkcfbdhnjickkkdbjoemdmbfginb?hl=en). 
+
+The selector gadget tool is useful in identifying the internal ids of the elements shown in the web page that we want to extract. Using it is a bit clumsy, often requiring a bit of mucking about, but it still makes our work a lot easier. We'll begin by using it to determine the id of the box containing the registrant of our our site. 
+1. Activate the Selector Gadget tool.
+2. Click on the box listing the registrant ("American & Efird, Inc."). You'll see a number of boxes in yellow, but we just want the one box in yellow.
+3. Click various other boxes until only the one we want is highlighted in yellow (or green). It's ok if others are in red. This may take a bit of trial and error, and if you get too mess up, you can start over by clicking the `Clear` button in the Selector Gadget floating toolbar.
+
+When successful, the box should display `.table tr:nth-child(1) td:nth-child(2)`. This uniquely identifies the html element containing the data we want. 
+
+With this id known, we can extract it's value in a two-step process. First we use `html_nodes()` to grab the element using its tag. Then we extract the value associated with that element text using the `html_text()` function. 
+
+```{r}
+Registrant <- webpage %>% 
+  html_nodes(".table tr:nth-child(1) td:nth-child(2)") %>% 
+  html_text()
+Registrant
+```
+
+EXERCISE:
+In the code chunk below, see if you can extract the Facility Type from the web page. Then using Selector Gadget to select multiple regions, grab all the average daily withdrawal values from the web page. Tip: Hold the <ctrl> key down while clicking elements to add/subtract regions from selected regions.
+
+```{r}
+FacilityType <- webpage %>% 
+  html_nodes("tr:nth-child(2) .left~ .left+ td.left") %>% 
+  html_text() 
+
+Withdrawals <- webpage %>% 
+  html_nodes('.table:nth-child(7) td:nth-child(7) , .table:nth-child(7) td:nth-child(3)') %>%
+  html_text()
+Withdrawals
+
+Discharges <- webpage %>% 
+  html_nodes(".table:nth-child(13) td:nth-child(7) , .table:nth-child(13) td:nth-child(3)") %>% 
+  html_text()
+Discharges
+```
+
+### Construct a dataframe from the data
+```{r}
+#Create a list of months
+month = format(ISOdatetime(2000,1:12,1,0,0,0),"%b")
+
+#Create a dataframe of withdrawals
+df_withdrawals <- as.data.frame(month) %>% 
+  bind_cols(withdrawal_mgd = as.numeric(Withdrawals)) %>% 
+  mutate(registrant = !!Registrant,
+         facility_type = !!FacilityType,
+         year = 2000,
+         date = my(paste(month,"-",year)))
+
+  
+#Plot 
+ggplot(df_withdrawals,aes(x=date,y=withdrawal_mgd)) + 
+  geom_line()
+
+```
+
