@@ -125,3 +125,31 @@ ggplot(df_withdrawals,aes(x=date,y=withdrawal_mgd)) +
 
 ```
 
+## All in one
+```{r}
+#Construct the URL
+the_base_url <- 'https://www.ncwater.org/WUDC/app/WWATR/report/view'
+the_site <- '0004-0001'
+the_year <- 2019
+the_scrape_url <- paste0(the_base_url, '/', the_site, '/', the_year)
+
+the_registrant_id <- '.table tr:nth-child(1) td:nth-child(2)'
+the_facility_id <- 'tr:nth-child(2) .left~ .left+ td.left'
+the_data_id <- '.table:nth-child(7) td:nth-child(7) , .table:nth-child(7) td:nth-child(3)'
+the_website <- read_html(the_scrape_url)
+
+#Scrape the data
+the_registrant <- the_website %>% html_nodes(the_registrant_id) %>% html_text()
+the_facility <- the_website %>% html_nodes(the_facility_id) %>% html_text()
+the_data <- the_website %>% html_nodes(the_data_id) %>% html_text()
+
+#Add to the dataframe
+df_withdrawals <- as.data.frame(format(ISOdatetime(2000,1:12,1,0,0,0),"%b")) %>% 
+  bind_cols(withdrawal_mgd = as.numeric(the_data)) %>% 
+  mutate(registrant = !!the_registrant,
+         facility_type = !!the_facility,
+         year = !!the_year,
+         date = my(paste(month,"-",year)))
+
+```
+
