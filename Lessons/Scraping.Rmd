@@ -224,20 +224,23 @@ scrape.it <- function(the_year, the_facility){
                                   the_facility, '/', the_year))
   
   #Set the element address variables (determined in the previous step)
-  the_registrant_id <- '.table tr:nth-child(1) td:nth-child(2)'
-  the_facility_id <- 'tr:nth-child(2) .left~ .left+ td.left'
-  the_data_id <- '.table:nth-child(7) td:nth-child(7) , .table:nth-child(7) td:nth-child(3)'
+  the_registrant_tag <- '.table tr:nth-child(1) td:nth-child(2)'
+  the_facility_name_tag <- 'tr:nth-child(2) th+ .left:nth-child(2)'
+  the_facility_id_tag <- 'tr:nth-child(2) .left~ .left+ td.left'
+  the_data_tag <- '.table:nth-child(7) td:nth-child(7) , .table:nth-child(7) td:nth-child(3)'
   
-  #Scrape the data
-  the_registrant <- the_website %>% html_nodes(the_registrant_id) %>% html_text()
-  the_facility_type <- the_website %>% html_nodes(the_facility_id) %>% html_text()
-  avg_withdrawals <- the_website %>% html_nodes(the_data_id) %>% html_text()
+  #Scrape the data items
+  the_registrant <- the_website %>% html_nodes(the_registrant_tag) %>% html_text()
+  the_facility_name <- the_website %>%   html_nodes(the_facility_name_tag) %>%  html_text()
+  the_facility_type <- the_website %>% html_nodes(the_facility_id_tag) %>% html_text()
+  avg_withdrawals <- the_website %>% html_nodes(the_data_tag) %>% html_text()
   
   #Convert to a dataframe
   df_withdrawals <- data.frame("Month" = rep(1:12),
                                "Year" = rep(the_year,12),
                                "Avg_Withdrawals_mgd" = as.numeric(avg_withdrawals)) %>% 
     mutate(Registrant = !!the_registrant,
+           Facility_name = !!the_facility_name,
            Facility_type = !!the_facility_type,
            Date = my(paste(Month,"-",Year)))
   
@@ -272,7 +275,7 @@ the_dfs <- lapply(X = the_years,
 the_dfs <- map(the_years,scrape.it,the_facility=my_facility)
 
 #Conflate the returned dataframes into a single dataframe
-the_df <- do.call("rbind",the_dfs)
+the_df <- bind_rows(the_dfs)
 
 #Plot, because it's fun and rewarding
 ggplot(the_df,aes(x=Date,y=Avg_Withdrawals_mgd)) + 
@@ -287,8 +290,11 @@ ggplot(the_df,aes(x=Date,y=Avg_Withdrawals_mgd)) +
 # Part 3. Web Crawling
 
 ## 3.1 Get a list of facility id's via scraping
-The main page of reports lists all the facilities, but not the ID's that we need to scrape a site. How do we get those? That takes just a bit of more advanced scraping. Here we show how you can scrape multiple tags into a list...
-```{r}
+Web crawling refers to navigating within a web site to scrape data across multiple sub-pages. In the exercise above, data are scraped from just one site. but what if we wanted to grab data from all sites? To do that, we'd need to drill into each site listed on the main page. 
+
+To do this just takes just a bit of more advanced scripting and scraping. Here we show how you can scrape multiple tags into a list and then "crawl" into each site and grab its data. 
+
+```{r get.a.list.of.facility.ids}
 #Set the web page
 the_main_url <- "https://www.ncwater.org/WUDC/app/WWATR/report"
 
@@ -309,8 +315,31 @@ the_facility_ids <- the_main_website %>%
 head(the_facility_ids)
 ```
 
-## Scrape 2020 water usage data for all sites 
+## 3.2 Scrape 2020 water usage data for all sites 
 We have our "scrape.it" function and our list of facility IDs. We can let the code do the work and scrape all the data for 2020. Here, to limit our demand on the DWR server, we'll just do a subset of facilities.
+
+```{r Scrape.all.2020.data}
+
+#Subset the facilities
+the_facility_ids_subset <-  sample(the_facility_ids,20)
+
+#Create a list of the year we want, the same length as the vector above
+the_years <- rep.int(2020,length(the_facility_ids_subset))
+
+#"Map" the scrape.it function to retrieve data for all these
+dfs_2020 <- map2(the_years, the_facility_ids_subset, scrape.it) 
+
+#Conflate the returned list of dataframes into a single one
+df_2020 <- bind_rows(dfs_2020)
+
+
+#Plot
+ggplot(df_2020,aes(y = Avg_Withdrawals_mgd, x=Facility_type)) +
+  geom_boxplot()
+
+```
+
+
 ```{r}
 #Create a subset of facilities
 the_facilities <- sample(the_facility_ids,3)
