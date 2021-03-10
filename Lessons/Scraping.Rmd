@@ -316,7 +316,11 @@ head(the_facility_ids)
 ```
 
 ## 3.2 Scrape 2020 water usage data for all sites 
-We have our "scrape.it" function and our list of facility IDs. We can let the code do the work and scrape all the data for 2020. Here, to limit our demand on the DWR server, we'll just do a subset of facilities.
+We have our "scrape.it" function and our list of facility IDs. We can let the code do the work and scrape all the data for 2020. Here, to limit our demand on the DWR server, we'll just do a subset of facilities. 
+
+We use Purrr's `map2` function which allow us to provide two vectors of equal length as parallel inputs such that the function provided (our `scrape.it` function) is run with element 1 of each list, then element 2, and so forth. This is why we need to create a list of the one year we want that is the same length as the sample of facility ids.
+
+This website gives a nice example of this: <https://dcl-prog.stanford.edu/purrr-parallel.html>
 
 ```{r Scrape.all.2020.data}
 
@@ -326,7 +330,7 @@ the_facility_ids_subset <-  sample(the_facility_ids,20)
 #Create a list of the year we want, the same length as the vector above
 the_years <- rep.int(2020,length(the_facility_ids_subset))
 
-#"Map" the scrape.it function to retrieve data for all these
+#"Map" the "scrape.it" function to retrieve data for all these
 dfs_2020 <- map2(the_years, the_facility_ids_subset, scrape.it) 
 
 #Conflate the returned list of dataframes into a single one
@@ -339,6 +343,9 @@ ggplot(df_2020,aes(y = Avg_Withdrawals_mgd, x=Facility_type)) +
 
 ```
 
+## 3.3 Scraping across years and sites.
+
+To scrape for both years and sites, we need to dig deeper into Purrr's map functions. Most importantly we need to use the `cross2()` function to create a list of each unique combination of `year` and `facility_id.` We then use the `lift()` function to extract these elements in a way that can be easily mapped to our function. 
 
 ```{r}
 #Create a subset of facilities
@@ -347,15 +354,13 @@ the_years = c(2018,2019,2020)
 
 #Use the cross2 function to generate a list of unique combos of year and facility ids
 #Then send apply our scrape.it function to grab values into a list of dataframes
-the_dfs <- cross2(the_years,the_facilities) %>% 
-  map(lift(scrape.it))
-
-#Combine the dataframes into single one
-the_df <- do.call("rbind",the_dfs)
+the_df <- cross2(the_years,the_facilities) %>% 
+  map(lift(scrape.it)) %>% 
+  bind_rows()
 
 #Plot
-ggplot(the_df,aes(x=Date,y=Withdrawals_mgd,color=Registrant)) + 
-  geom_line() + 
+ggplot(the_df,aes(x=Date,y=Avg_Withdrawals_mgd,color=Facility_name)) + 
+  #geom_line() + 
   geom_smooth(method="loess",se=FALSE) +
   labs(title = "Water usage data",
        y="Withdrawal (mgd)",
