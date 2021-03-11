@@ -39,7 +39,7 @@ Web scraping is the process of pulling data directly from websites. Copy and pas
 
 ### Some important caveats
 You might now feel that web scraping isn't always legitimate - and you're right! Not all content providers want their sites to be scraped. To ensure that your web scraping is done ethically, check out this great article covering the ethics and legality of web scraping: <https://prowebscraper.com/blog/is-web-scraping-legal/>
-<https://smac-group.github.io/ds/web-scraping-in-r.html>
+
 
 > For discussion: Can you give examples of ethical and unethical web scraping?
 
