@@ -1,12 +1,15 @@
 ---
-title: "Assignment 9: Spatial Analysis in R"
+title: "Assignment: Spatial Analysis in R"
 author: "Student Name"
-output: pdf_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: "cosmo"
 geometry: margin=2.54cm
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
-
 ## OVERVIEW
 
 This exercise accompanies the lessons in Environmental Data Analytics (ENV872L) on spatial analysis.
@@ -20,77 +23,64 @@ Space for your answers is provided in this document and is indicated by the ">" 
 If you need a second paragraph be sure to start the first line with ">".
 You should notice that the answer is highlighted in green by RStudio. 
 6. When you have completed the assignment, **Knit** the text and code into a single HTML file.
-7. After Knitting, please submit the completed exercise (PDF file) in Sakai. Please add your last name into the file name (e.g., "Fay_A10_SpatialAnalysis.pdf") prior to submission.
+7. After Knitting, please submit the completed exercise (PDF file) to the dropbox in Sakai. Please add your last name into the file name (e.g., "Fay_A09_TimeSeries.pdf") prior to submission.
 
 ## DATA WRANGLING
 
 ### 1. Prepare the workspace
-* Import: tidyverse, sf, leaflet, and mapview
+* Import: tidyverse, sf, and leaflet
 ```{r Prepare workspace}
-getwd()
 
-library(tidyverse)
-library(sf)
-library(leaflet)
-library(mapview)
 ```
 
-### 2. Read (and filter) county features into an sf dataframe and plot
-In this exercise, we will be exploring stream gage height data in Nebraska 
-corresponding to floods occuring there. First, we will import from the US 
-Counties shapefile we've used in lab lessons, filtering it this time for just 
-Nebraska counties. Nebraska's state FIPS code is `31` (as North Carolina's 
-was `37`). 
+### 2. Read filtered county features into an sf dataframe and plot
+In this exercise, we will be exploring stream gage height data in Nebraska, 
+as there's been recent floods there. First, we will import from the US Counties  
+shapefile we've used in lab lessons, filtering it this time for just Nebraska counties. 
+Nebraska's state FIPS code is `31` (as North Carolina's was `37`). 
 
 * Read the cb_2017_us_county_20m.shp shapefile into an sf dataframe
 * Filter for Nebraska counties (State FIPS = 31)
 * Show the dataset's coordinate reference system
 * Plot the records as a map (in any format)
-
 ```{r Read the county data into an sf dataframe}
-#Read in Counties shapefile into an sf dataframe, filtering for just NE counties
-sf_counties <- st_read('./Data/Spatial/cb_2017_us_county_20m.shp') %>% 
-  filter(STATEFP == 31)
+#Read in Counties shapefile into an sf dataframe, filtering for just NC counties
+
 
 #Reveal the CRS of the counties features
-st_crs(sf_counties)
+
 
 #Plot the data
-mapview(sf_counties)
 
 ```
-> QUESTION: What is the EPSG code of the Counties dataset? Using 
-http://spatialreference.org, is this a geographic or a projected 
-coordinate system? (Or, does this CRS use angular or planar 
-coordinate units?) To what datum is this CRS associated?  
+> QUESTION: What is the EPSG code of the Counties dataset? Using http://spatialreference.org, is this a geographic or a projected coordinate system? (Or, does this CRS use angular or planar coordinate units?) To what datum is this CRS associated?  
 > ANSWER: 
 
 ### 3. Read in gage locations csv as a dataframe, then display the column names it contains
-Next we'll read in some USGS/NWIS gage location data I've added to the `Data/Raw` 
-folder. These are in the `NWIS_SiteInfo_NE_RAW.csv` file. (See 
-`NWIS_SiteInfo_NE_RAW.README.txt` for more info on this datset.)
+Next we'll read in some USGS/NWIS gage location data I've added to the `Data/Raw` folder. These 
+are in the `NWIS_SiteInfo_NE_RAW.csv` file. (See `NWIS_SiteInfo_NE_RAW.README.txt` for more 
+info on this datset.)
 * Read the NWIS_SiteInfo_NE_RAW.csv file into a standard dataframe
 * Display the column names of this dataset
 ```{r Read in USGS Gage Locations}
 #Read in gage locations csv as a dataframe
-df_gages <- read.csv('./Data/Raw/NWIS_SiteInfo_NE_RAW.csv')
+
 
 #Reveal the names of the columns
-colnames(df_gages)
 
 ```
 > QUESTION: What columns in the dataset contain the x and y coordinate values, respectively? 
 > ANSWER: 
 
 ### 4. Convert the gage locations dataframe to an sf dataframe of points
-* These data use the same coordinate reference system as the counties dataset
+* These data use the same coordnate reference system as the counties dataset
 * Display the column names of the resulting sf dataframe
 ```{r}
 #Convert to an sf object
-sf_gages = st_as_sf(df_gages, coords =  c('dec_long_va','dec_lat_va'), crs = st_crs(sf_counties))
 
-#Re-examine the column names
-columns(sf_gages)
+
+#Reveal the structure
+
 ```
 > QUESTION: What new field(s) appear in the sf dataframe created? What field(s), if any, disappeared?
 > ANSWER: 
@@ -99,13 +89,9 @@ columns(sf_gages)
 ### 5. Use `ggplot` to plot the gage locations on top of the counties
 * Plot the different datasets in different colors
 ```{r}
-mapview(sf_counties,col.regions='red') + 
-  mapview(sf_gages,cex = 4)
-
 ggplot() + 
-  geom_sf(data = sf_counties) + 
-  geom_sf(data = sf_gages, aes(color='red')) 
-
+  geom_sf(data = sf_counties,col='red') + 
+  geom_sf(data = sf_gageloc,col='blue')
 ```
 
 
@@ -117,25 +103,21 @@ stream gage heights (in meters) recorded during the recent flood event. This fil
 
 * Read this dataset in as a dataframe. 
 * Join our site information (already imported above) to these gage height data. 
- * The `site_no` and `station_nm` can both/either serve as joining attributes. 
- * Construct this join so that the result only includes spatial features where both tables have data. 
-* Show the column names in this resulting spatial features object
+ * The `site_no` and `station_nm` can both serve as joining attributes. 
+ * Construct this join so that the result only includes records where both tables have data. 
+* Show the column names in this resulting dataframe
 * Once joined, we will again have to convert this product (a dataframe) into a spatial dataframe. Do that.
 ```{r}
-#Read the site flow data into a data frame
-df_flowdata <- read.csv('./Data/Raw/NWIS_SiteFlowData_NE_RAW.csv')
+#Read in the data
+
 
 #Show the column names
-colnames(df_flowdata)
+
 
 #Join location data to it
-sf_merged <- merge(sf_gages, df_flowdata, by = 'site_no', all.x = FALSE)
 
-#Show the column names of the joined dataset
-colnames(sf_merged)
 
-#Show the dimensions of this joined dataset
-dim(sf_merged)
+#Convert back to sf dataframe
 
 ```
 
@@ -146,8 +128,8 @@ Now we can examine where the flooding appears most acute by visualizing gage hei
 * Plot the gage sites on top of counties
  * Show the magnitude of gage height by color, shape, other visualization technique.
 ```{r}
-#Map the points, sized by gage height
-mapview(sf_counties, alpha.regions = 0.2, col.regions = 'grey') + mapview(sf_merged, cex = 'gage_ht')
+#Plot the values
+
 ```
 
 ## SPATIAL ANALYSIS
@@ -155,20 +137,12 @@ Up next we will do some spatial analysis with our data. To prepare for this, we 
 transform our data into a projected coordinate system. We'll choose UTM Zone 14N (EPGS = 32614).
 
 ### 8. Transform the counties and gage site datasets to UTM Zone 14N
-* Transform each dataset to CRS 32614
-* Using mapview, plot the data so that each can be seen as different colors
+* Transform each dataset to crs 32614
+* Using ggplot, plot the data so that each can be seen as different colors
 ```{r}
 #Transform the counties and gage location datasets to UTM Zone 14
-sf_counties_utm <- st_transform(sf_counties, crs = 32614)
-sf_merged_utm <- st_transform(sf_merged, crs = 32614)
 
 #Plot the data
-mapview(sf_counties_utm, alpha.regions = 0.2, col.regions = 'grey') + 
-  mapview(sf_merged_utm, cex = 'gage_ht')
-
-ggplot() + 
-  geom_sf(data = sf_counties_utm) + 
-  geom_sf(data = sf_merged_utm, aes(size = gage_ht))
 
 ```
 > QUESTION: The shape of Nebraska should look a bit different than the one created in Step 5? Why?
@@ -176,7 +150,7 @@ ggplot() +
 
 ### 9. Select the gages falling within a given county
 Now let's zoom into a particular county and examine the gages located there. 
-* Import the HUC8 dataset (`NE_HUC8s.shp` in the Data\Spatial folder)
+* Import the HUC8 dataset (`NE_HUC8s_prj.shp` in the Data\Spatial folder)
 * Select Lancaster county from your county sf dataframe
 * Select the gage sites falling `within` that county
  * Remember you'll have to create a mask and then apply that mask
@@ -185,20 +159,11 @@ Now let's zoom into a particular county and examine the gages located there.
  * the selected county, 
  * and the gage sites in that county
 ```{r}
-#Import the HUC8 dataset
-huc8_sf <- st_read('./Data/Spatial/NE_HUC8s.shp')
-
 #Select the county
-sf_lancaster <- sf_counties_utm %>% 
-  filter(NAME == "Lancaster")
 
-#Select gages within the selected county
-lancaster_gages <- sf_merged_utm[sf_lancaster, ]
+#Select gages within 
 
 #Plot
-mapview(sf_counties_utm, color = 'red', alpha.regions = 0) + 
-  mapview(sf_lancaster) +
-    mapview(lancaster_gages, color = 'blue')
 
 ```
 
@@ -215,15 +180,10 @@ attributes of the county in which it is located.
   * Display each gage size proportional to its "gage_ht" value
 ```{r Spatial Join}
 #Join features
-joined_data <- st_join(sf_merged_utm,sf_counties_utm)
 
 #Show column names
-names(joined_data)
 
 #Plot
-ggplot() + 
-  geom_sf(data = sf_counties_utm) + 
-  geom_sf(data = joined_data, aes(size = gage_ht, color=NAME))
 
 ```
 
